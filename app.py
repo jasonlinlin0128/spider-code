@@ -59,15 +59,25 @@ def search_component_info(component_name):
     all_results = []
     
     # 獲取一個隨機的 User-Agent 和基礎 HTTP 標頭
+  # Inside search_component_info function
     random_user_agent = random.choice(USER_AGENTS)
     base_headers = {
         'User-Agent': random_user_agent,
         'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        # --- 新增這些 Headers ---
+        'Referer': 'https://www.google.com/', # 模擬從 Google 搜尋過來的
+        'DNT': '1', # Do Not Track header，告訴網站不要追蹤
+        'Upgrade-Insecure-Requests': '1', # 請求安全版本的頁面
+        'Sec-Fetch-Dest': 'document', # 模擬瀏覽器發出請求的目的地
+        'Sec-Fetch-Mode': 'navigate', # 模擬瀏覽器導航模式
+        'Sec-Fetch-Site': 'none', # 模擬請求的來源站點
+        'Sec-Fetch-User': '?1', # 模擬使用者啟動的導航
     }
-
+    # 注意：'Origin' 這個 Header 有時會很敏感，如果加入後依然報錯，可以考慮移除它。
+    # 因為它通常只在跨域請求時使用，這裡我們直接訪問目標網站。
     # 我們將依序呼叫各個網站的爬蟲函數，並在每次呼叫後添加隨機延遲
     
     # 1. 搜尋 RS Components
