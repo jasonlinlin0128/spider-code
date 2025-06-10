@@ -196,34 +196,248 @@ def scrape_wago(component_name):
 # --- 其他網站的爬蟲函數 (這是您需要自行依循範例完成的部分) ---
 # 目前這些是佔位符，您可以根據需要來實現它們
 def scrape_digikey(component_name):
-    print(f"正在搜尋 Digi-Key for {component_name}...")
-    return [{
-        "vendor": "Digi-Key",
-        "name": f"請在 Digi-Key 實作 {component_name} 的爬蟲",
-        "link": f"https://www.digikey.tw/zh/products/search?keywords={component_name}",
-        "price": "待實作",
-        "stock": "待實作"
-    }]
+    vendor_results = []
+    # Digi-Key 的搜尋 URL 格式通常如下
+    search_url = f"https://www.digikey.tw/zh/products/search?keywords={component_name}"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36'
+    }
+
+    print(f"正在搜尋 Digi-Key for {component_name}...") # 增加日誌輸出
+
+    try:
+        response = requests.get(search_url, headers=headers, timeout=15) # 增加超時時間
+        response.raise_for_status() # 如果狀態碼不是 200，拋出異常
+
+        # 檢查是否被反爬蟲機制阻擋（例如重定向到驗證碼頁面）
+        if "recaptcha" in response.url or "captcha" in response.text.lower():
+            print(f"Digi-Key: 可能遇到反爬蟲機制，需要手動驗證。")
+            vendor_results.append({
+                "vendor": "Digi-Key",
+                "error": "可能遇到反爬蟲機制，請嘗試手動訪問或稍後再試。"
+            })
+            return vendor_results
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # --- **重要：這部分需要根據您 F12 觀察到的實際 HTML 結構修改** ---
+        # 尋找包含所有產品結果的容器。例如，它可能是個 div 且有一個特定的 class 或 id。
+        # 範例：如果所有產品結果在一個 id 為 'resultsTable' 的 table 裡
+        # 或者一個 class 為 'MuiGrid-container' 的 div 裡
+        
+        # 假設產品列表的每個產品在一個 class 為 'product-card' 的 div 裡 (僅為範例)
+        # 您需要替換這裡的選擇器來匹配 Digi-Key 的實際 HTML 結構
+        product_items = soup.find_all('div', class_='MuiGrid-root MuiGrid-item MuiGrid-grid-xs-12 MuiGrid-grid-sm-6 MuiGrid-grid-md-4 MuiGrid-grid-lg-3') 
+        
+        if not product_items:
+            print(f"Digi-Key: 未找到 '{component_name}' 相關產品項目，檢查選擇器或結果頁面。")
+            vendor_results.append({
+                "vendor": "Digi-Key",
+                "error": "未找到產品結果，可能網頁結構有變或無相關產品。"
+            })
+            return vendor_results
+
+        for item in product_items[:3]: # 只抓取前 3 個結果以簡化輸出
+            # 產品名稱和連結：通常在一個 <a> 標籤裡
+            # 範例：<a class="product-link" href="...">Product Name</a>
+            title_tag = item.find('a', class_='MuiTypography-root MuiLink-root MuiLink-underlineNone MuiTypography-body1')
+            
+            # 產品價格：通常在一個 span 標籤裡，例如 <span class="price">NT$ 123.45</span>
+            price_tag = item.find('span', class_='MuiTypography-root MuiTypography-body1 MuiTypography-noWrap') # 這是範例，請替換
+            
+            # 庫存：通常在另一個 span 或 div 裡
+            stock_tag = item.find('p', class_='MuiTypography-root MuiTypography-body2 MuiTypography-colorTextSecondary') # 這是範例，請替換
+
+            if title_tag and price_tag and stock_tag:
+                title = title_tag.get_text(strip=True)
+                # 確保連結是完整的，Digi-Key 的連結通常是相對路徑，需要加上域名
+                link = "https://www.digikey.tw" + title_tag['href']
+                price = price_tag.get_text(strip=True)
+                stock = stock_tag.get_text(strip=True) # 可能需要進一步處理，例如只取數字
+
+                vendor_results.append({
+                    "vendor": "Digi-Key",
+                    "name": title,
+                    "link": link,
+                    "price": price,
+                    "stock": stock
+                })
+            else:
+                print(f"Digi-Key: 某些產品資訊（標題/價格/庫存）未找到，檢查選擇器。")
+                
+    except requests.exceptions.RequestException as e:
+        print(f"Digi-Key 訪問錯誤: {e}")
+        vendor_results.append({
+            "vendor": "Digi-Key",
+            "error": f"訪問失敗: {e}"
+        })
+    except Exception as e:
+        print(f"Digi-Key 解析錯誤: {e}")
+        vendor_results.append({
+            "vendor": "Digi-Key",
+            "error": "頁面解析失敗，可能網站結構有變或選擇器錯誤。"
+        })
+    
+    return vendor_results
 
 def scrape_mouser(component_name):
+    vendor_results = []
+    # Mouser 的搜尋 URL 格式通常如下
+    search_url = f"https://www.mouser.tw/Search/Refine?Keyword={component_name}"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36'
+    }
+
     print(f"正在搜尋 Mouser for {component_name}...")
-    return [{
-        "vendor": "Mouser",
-        "name": f"請在 Mouser 實作 {component_name} 的爬蟲",
-        "link": f"https://www.mouser.tw/Search/Refine?Keyword={component_name}",
-        "price": "待實作",
-        "stock": "待實作"
-    }]
+
+    try:
+        response = requests.get(search_url, headers=headers, timeout=15)
+        response.raise_for_status()
+
+        # Mouser 通常不會直接顯示驗證碼，但可能會有其他反爬蟲策略
+        if "captcha" in response.text.lower() or "verify" in response.url.lower():
+            print(f"Mouser: 可能遇到反爬蟲機制。")
+            vendor_results.append({
+                "vendor": "Mouser",
+                "error": "可能遇到反爬蟲，請手動訪問或稍後再試。"
+            })
+            return vendor_results
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # --- **重要：這部分需要根據您 F12 觀察到的實際 HTML 結構修改** ---
+        # Mouser 搜尋結果通常在一個表格中，每行代表一個產品。
+        # 假設產品行是 <tr class="SearchResultsRow"> (這是一個範例，請替換)
+        product_rows = soup.find_all('tr', class_='searchResultsRow') # 這是範例，請替換為實際的 class
+
+        if not product_rows:
+            print(f"Mouser: 未找到 '{component_name}' 相關結果，檢查選擇器或結果頁面。")
+            vendor_results.append({
+                "vendor": "Mouser",
+                "error": "未找到產品結果，可能網頁結構有變或無相關產品。"
+            })
+            return vendor_results
+
+        for row in product_rows[:3]: # 只抓取前 3 個結果
+            # 產品名稱和連結：例如在一個 <a class="product-title-link" href="...">...</a>
+            # 您需要找到包含名稱和連結的標籤
+            title_link_tag = row.find('a', class_='MfrPartLink') # 這是範例，請替換為實際的 class
+
+            # 價格：例如在一個 <span class="price-value">...</span>
+            price_tag = row.find('td', class_='pricing').find('span', class_='pricing-value') # 這是範例，請替換
+
+            # 庫存：例如在一個 <span class="avail-stock">...</span>
+            stock_tag = row.find('div', class_='availableStock') # 這是範例，請替換
+
+            if title_link_tag: # 至少有標題和連結才處理
+                title = title_link_tag.get_text(strip=True)
+                link = "https://www.mouser.tw" + title_link_tag['href'] # Mouser 連結通常是相對路徑
+
+                price = price_tag.get_text(strip=True) if price_tag else "無資訊"
+                stock = stock_tag.get_text(strip=True) if stock_tag else "無資訊"
+
+                vendor_results.append({
+                    "vendor": "Mouser",
+                    "name": title,
+                    "link": link,
+                    "price": price,
+                    "stock": stock
+                })
+            else:
+                print(f"Mouser: 某些產品資訊（標題/連結）未找到。")
+
+    except requests.exceptions.RequestException as e:
+        print(f"Mouser 訪問錯誤: {e}")
+        vendor_results.append({
+            "vendor": "Mouser",
+            "error": f"訪問失敗: {e}"
+        })
+    except Exception as e:
+        print(f"Mouser 解析錯誤: {e}")
+        vendor_results.append({
+            "vendor": "Mouser",
+            "error": "頁面解析失敗，可能網站結構有變或選擇器錯誤。"
+        })
+    
+    return vendor_results
 
 def scrape_octopart(component_name):
+    vendor_results = []
+    # Octopart 搜尋 URL 格式
+    search_url = f"https://octopart.com/search?q={component_name}"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36'
+    }
+
     print(f"正在搜尋 Octopart for {component_name}...")
-    return [{
-        "vendor": "Octopart",
-        "name": f"請在 Octopart 實作 {component_name} 的爬蟲 (可能需進階工具)",
-        "link": f"https://octopart.com/search?q={component_name}",
-        "price": "待實作",
-        "stock": "待實作"
-    }]
+
+    try:
+        response = requests.get(search_url, headers=headers, timeout=20) # 增加超時時間
+        response.raise_for_status()
+
+        # Octopart 的內容可能 heavily relies on JavaScript,
+        # 所以直接用 BeautifulSoup 抓取原始 HTML 可能會得到空的結果。
+        # 您可以在 Render 的 Logs 中檢查 response.text 的內容，看看是否有實際的產品 HTML。
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # --- **重要：以下選擇器是假設內容在原始 HTML 中可見** ---
+        # 您需要仔細觀察 F12 中，產品卡片或列表的 HTML 結構
+        # 例如：<div class="card product-card"> ... </div>
+        product_cards = soup.find_all('div', class_='ProductSearch_ProductSummaryCard__vjM4O') # 這是撰寫時的範例，極可能變動
+
+        if not product_cards:
+            print(f"Octopart: 未找到 '{component_name}' 相關結果，可能網頁內容動態載入或結構變動。")
+            vendor_results.append({
+                "vendor": "Octopart",
+                "error": "未找到產品結果，可能內容動態載入或結構有變，請考慮使用進階爬蟲或 API。"
+            })
+            return vendor_results
+
+        for card in product_cards[:3]: # 只抓取前 3 個結果
+            # 產品名稱和連結
+            title_link_tag = card.find('a', class_='ProductSummaryCard_productLink__aD4sE') # 範例
+            
+            # 通常 Octopart 會列出多個供應商的價格和庫存，這會更複雜
+            # 您可能需要遍歷供應商的列表，例如：
+            # supplier_info_tags = card.find_all('div', class_='supplier-row')
+
+            if title_link_tag:
+                title = title_link_tag.get_text(strip=True)
+                link = "https://octopart.com" + title_link_tag['href'] # Octopart 連結通常是相對路徑
+
+                # 為了簡化，這裡暫時不實作多個供應商的價格/庫存，
+                # 您可以找到一個代表性的價格/庫存顯示位置
+                # 例如：
+                price_tag = card.find('span', class_='ProductSummaryCard_price__some_hash') # 這是範例，請替換
+                stock_tag = card.find('span', class_='ProductSummaryCard_stock__some_hash') # 這是範例，請替換
+                
+                price = price_tag.get_text(strip=True) if price_tag else "無資訊"
+                stock = stock_tag.get_text(strip=True) if stock_tag else "無資訊"
+
+                vendor_results.append({
+                    "vendor": "Octopart",
+                    "name": title,
+                    "link": link,
+                    "price": price,
+                    "stock": stock
+                })
+            else:
+                print(f"Octopart: 某些產品資訊未找到。")
+
+    except requests.exceptions.RequestException as e:
+        print(f"Octopart 訪問錯誤: {e}")
+        vendor_results.append({
+            "vendor": "Octopart",
+            "error": f"訪問失敗: {e}"
+        })
+    except Exception as e:
+        print(f"Octopart 解析錯誤: {e}")
+        vendor_results.append({
+            "vendor": "Octopart",
+            "error": "頁面解析失敗，可能網站結構有變或選擇器錯誤，或內容為JS動態載入。"
+        })
+    
+    return vendor_results
 
 def handle_kss_pdf_info():
     return {
